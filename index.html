@@ -14,19 +14,9 @@
     <!-- 引入 Tailwind CSS 用于快速响应式布局 -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- --- 新增：纯净版 Firebase 库 (移除 Auth 模块，避免被墙) --- -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // 将 Firebase 函数挂载到 window，以便 React 可以使用
-        window.initializeApp = initializeApp;
-        window.getFirestore = getFirestore;
-        window.doc = doc;
-        window.setDoc = setDoc;
-        window.onSnapshot = onSnapshot;
-        window.collection = collection;
-    </script>
+    <!-- --- 核心修复：使用国内 CDN 加载 Firebase，彻底解决手机端 gstatic 被墙导致无法加载的问题 --- -->
+    <script src="https://cdn.staticfile.net/firebase/10.13.1/firebase-app-compat.min.js"></script>
+    <script src="https://cdn.staticfile.net/firebase/10.13.1/firebase-firestore-compat.min.js"></script>
 
     <style>
         input[type="number"]::-webkit-inner-spin-button,
@@ -276,18 +266,28 @@
             };
 
             // =========================================================
-            // 核心：Firebase 直连数据监听 (无身份验证版)
+            // 核心：Firebase 传统直连数据监听 (彻底摒弃模块化加载防墙)
             // =========================================================
             useEffect(() => {
                 let unsubGroups = null;
                 let unsubKnockout = null;
+                let isResolved = false;
+
+                // 容错：5秒内如果还没有加载好，强制进入本地模式
+                const timeoutId = setTimeout(() => {
+                    if (!isResolved) {
+                        console.warn("⚠️ Firebase 网络连接超时！自动降级为单机离线模式。");
+                        setIsCloudReady(true);
+                        isResolved = true;
+                    }
+                }, 5000);
 
                 const checkFirebase = setInterval(() => {
-                    if (window.initializeApp && window.getFirestore) {
+                    // 使用 window.firebase 判断（这是 Compat 版的挂载方式）
+                    if (window.firebase && window.firebase.firestore) {
                         clearInterval(checkFirebase);
                         
                         try {
-                            // ！！！已经填入你的真实配置 ！！！
                             const firebaseConfig = {
                                 apiKey: "AIzaSyBUUccXqrmsgQySKhNO1oSawpinwNASCmk",
                                 authDomain: "badminton-score-c48af.firebaseapp.com",
@@ -298,69 +298,72 @@
                                 measurementId: "G-D7YZC9KRWE"
                             };
 
-                            // 如果依然是默认的占位符，安全退回本地模式
-                            if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
-                                console.warn("检测到默认的 Firebase 配置，已切回单机离线模式。");
-                                const savedMatches = localStorage.getItem('bd_groups_v3');
-                                const savedKnockout = localStorage.getItem('bd_knockout_v3');
-                                if (savedMatches) setMatches(JSON.parse(savedMatches));
-                                if (savedKnockout) setKnockout(JSON.parse(savedKnockout));
-                                setIsCloudReady(true);
-                                return;
+                            // 防止重复初始化报错
+                            let app;
+                            if (!window.firebase.apps.length) {
+                                app = window.firebase.initializeApp(firebaseConfig);
+                            } else {
+                                app = window.firebase.app();
                             }
-
-                            // 初始化 Firebase (不带 Auth)
-                            const app = window.initializeApp(firebaseConfig);
-                            const db = window.getFirestore(app);
+                            
+                            const db = window.firebase.firestore();
                             dbRef.current = db;
 
-                            const publicDataRef = window.collection(db, 'tournament_data');
+                            const publicDataRef = db.collection('tournament_data');
 
-                            // 直接监听数据，无需等待登录！
-                            unsubGroups = window.onSnapshot(window.doc(publicDataRef, 'groups'), (snapshot) => {
-                                if (snapshot.exists() && snapshot.data().matches) {
+                            // 直接监听数据 (要求你的 Firebase Rules 里 allow read, write: if true;)
+                            unsubGroups = publicDataRef.doc('groups').onSnapshot((snapshot) => {
+                                if (snapshot.exists && snapshot.data().matches) {
                                     setMatches(snapshot.data().matches);
                                 }
-                            }, (err) => console.error("小组赛同步断开", err));
+                            }, (err) => console.error("小组赛同步被中断或没权限:", err));
 
-                            unsubKnockout = window.onSnapshot(window.doc(publicDataRef, 'knockout'), (snapshot) => {
-                                if (snapshot.exists()) {
+                            unsubKnockout = publicDataRef.doc('knockout').onSnapshot((snapshot) => {
+                                if (snapshot.exists) {
                                     setKnockout(snapshot.data());
                                 }
-                            }, (err) => console.error("淘汰赛同步断开", err));
+                            }, (err) => console.error("淘汰赛同步被中断或没权限:", err));
 
-                            // 立刻标记为云端就绪
-                            setIsCloudReady(true);
+                            // 如果没超时，标记为云端已就绪
+                            if (!isResolved) {
+                                setIsCloudReady(true);
+                                isResolved = true;
+                            }
 
                         } catch (e) {
-                            console.error("Firebase 初始化发生错误", e);
-                            setIsCloudReady(true);
+                            console.error("Firebase 初始化发生错误:", e);
+                            if (!isResolved) { setIsCloudReady(true); isResolved = true; }
                         }
                     }
                 }, 100);
 
                 return () => {
                     clearInterval(checkFirebase);
+                    clearTimeout(timeoutId);
                     if (unsubGroups) unsubGroups();
                     if (unsubKnockout) unsubKnockout();
                 };
             }, []);
 
-            // --- 向云端写入数据 (无鉴权保护，依赖安全规则为 true) ---
+            // --- 向云端写入数据 (包含失败弹窗提醒) ---
             const saveToCloud = async (type, data) => {
                 if (userRole !== 'ADMIN') return;
                 
-                // 本地备份
+                // 无论网好不好，本地先备份
                 if(type === 'groups') localStorage.setItem('bd_groups_v3', JSON.stringify(data));
                 if(type === 'knockout') localStorage.setItem('bd_knockout_v3', JSON.stringify(data));
 
                 if (dbRef.current) {
                     try {
-                        const publicDataRef = window.collection(dbRef.current, 'tournament_data');
-                        await window.setDoc(window.doc(publicDataRef, type), type === 'groups' ? { matches: data } : data);
+                        const payload = type === 'groups' ? { matches: data } : data;
+                        await dbRef.current.collection('tournament_data').doc(type).set(payload);
+                        console.log(`[云端同步成功] ${type} 数据已推送`);
                     } catch (err) {
                         console.error(`保存 ${type} 到云端失败:`, err);
+                        customAlert(`⚠️ 云端推送失败！\n原因：${err.message}\n请检查网络或确认 Firebase 数据库的 Rules 是否已设置为 true。`);
                     }
+                } else {
+                    console.warn("当前处于离线模式，只保存在本地。");
                 }
             };
 
@@ -419,6 +422,7 @@
                         <div className="flex flex-col items-center text-center">
                             <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-200 border-t-emerald-500 mb-4"></div>
                             <div className="text-slate-500 font-bold mb-2">连接云端赛事中心...</div>
+                            <div className="text-xs text-slate-400 bg-slate-100 px-4 py-2 rounded-full mt-2">若网络不佳，系统将在5秒后自动启动离线模式</div>
                         </div>
                     </div>
                 );
@@ -680,7 +684,7 @@
                     });
                     setMatches(newMatches);
                     saveToCloud('groups', newMatches); 
-                    customAlert("✅ 小组赛比分已全部随机填满并推送！");
+                    customAlert("✅ 小组赛比分已全部随机填满并推送到云端！");
                 });
             };
 
@@ -1043,7 +1047,7 @@
                         {userRole === 'ADMIN' && (
                             <div className="mt-12 text-center border-t border-slate-200 pt-6">
                                 <button onClick={devAutoFillGroupStage} className="text-xs text-blue-400 underline mr-6 hover:text-blue-600 transition-colors">
-                                    🛠 测试用: 随机填满比分并广播
+                                    🛠 测试用: 随机填满比分并推送
                                 </button>
                                 <button onClick={resetAllData} className="text-xs text-rose-400 underline hover:text-rose-600 transition-colors">
                                     ⚠ 清空云端所有赛事数据
