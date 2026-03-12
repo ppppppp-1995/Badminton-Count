@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🏸 羽毛球双打小组赛计分系统</title>
+    <!-- 引入 React 和 ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- 引入 Babel 用于浏览器内编译 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 引入 Tailwind CSS 用于快速响应式布局 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 隐藏数字输入框的上下箭头，适配 iPad 触控 */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        body {
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- 队伍基础数据 ---
+        const TEAMS = [
+            { id: '4', name: '4队', players: 'rex / 歪歪', group: 'A' },
+            { id: '6', name: '6队', players: '木目 木几 / 砸不开的黑夜内核', group: 'A' },
+            { id: '9', name: '9队', players: '百子湾金高银 / 上地马嘉琪', group: 'A' },
+            { id: '14', name: '14队', players: 'lisir / 火山 女且', group: 'A' },
+
+            { id: '1', name: '1队', players: '土拨鼠 / 🍑', group: 'B' },
+            { id: '3', name: '3队', players: '馄饨 / 菠萝鸡粒', group: 'B' },
+            { id: '8', name: '8队', players: '好吃好吃鳕鱼堡 / 五米', group: 'B' },
+            { id: '12', name: '12队', players: '土豆牛肉 / 大力西瓜', group: 'B' },
+
+            { id: '2', name: '2队', players: '娃哈哈 / 娃哈哈代1', group: 'C' },
+            { id: '7', name: '7队', players: '四月 / 菩提', group: 'C' },
+            { id: '10', name: '10队', players: '狐狸爱吃鱼 / 小k', group: 'C' },
+            { id: '15', name: '15队', players: '吴桐 / mia', group: 'C' },
+
+            { id: '5', name: '5队', players: '若若 / 若若代1', group: 'D' },
+            { id: '11', name: '11队', players: '神秘玩家 / X.cb', group: 'D' },
+            { id: '13', name: '13队', players: '昨晚你可不是这么说的 / AAA王哥', group: 'D' },
+            { id: '16', name: '16队', players: 'Ray / 小赖', group: 'D' },
+        ];
+
+        // --- 提取子组件以避免重新渲染导致的焦点丢失和页面跳动 ---
+        // 比赛卡片组件
+        const MatchCard = ({ match, t1, t2, onScoreChange, onToggleStatus }) => {
+            return (
+                <div className={`p-4 rounded-xl shadow-sm border-2 ${match.isFinished ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200'} mb-4 transition-all`}>
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">第 {match.round} 轮</span>
+                        {match.isFinished && <span className="text-sm font-bold text-emerald-600 flex items-center">✅ 已确认</span>}
+                    </div>
+                    
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        {/* 队伍 1 */}
+                        <div className="flex-1 w-full text-center md:text-right">
+                            <div className="text-lg font-bold text-slate-800">{t1.name}</div>
+                            <div className="text-xs text-slate-500">{t1.players}</div>
+                        </div>
+
+                        {/* 比分输入区 - 只有一局比分 */}
+                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg w-full md:w-auto justify-center">
+                            <div className="flex flex-col items-center">
+                                <label className="text-xs text-slate-400 mb-1">比分</label>
+                                <input type="number" min="0" 
+                                    disabled={match.isFinished}
+                                    className="w-20 h-14 text-center text-2xl font-bold rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-transparent"
+                                    value={match.t1Points} 
+                                    onChange={(e) => onScoreChange(match.id, 't1Points', e.target.value)} />
+                            </div>
+                            <span className="text-2xl font-black text-slate-300 mx-2">:</span>
+                            <div className="flex flex-col items-center">
+                                <label className="text-xs text-slate-400 mb-1">比分</label>
+                                <input type="number" min="0" 
+                                    disabled={match.isFinished}
+                                    className="w-20 h-14 text-center text-2xl font-bold rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-transparent"
+                                    value={match.t2Points} 
+                                    onChange={(e) => onScoreChange(match.id, 't2Points', e.target.value)} />
+                            </div>
+                        </div>
+
+                        {/* 队伍 2 */}
+                        <div className="flex-1 w-full text-center md:text-left">
+                            <div className="text-lg font-bold text-slate-800">{t2.name}</div>
+                            <div className="text-xs text-slate-500">{t2.players}</div>
+                        </div>
+                    </div>
+
+                    {/* 操作按钮 */}
+                    <div className="mt-4 flex justify-center border-t border-slate-100 pt-3">
+                        <button 
+                            onClick={() => onToggleStatus(match.id)}
+                            className={`px-8 py-2 rounded-full font-bold text-white shadow-sm transition-colors ${match.isFinished ? 'bg-slate-400 hover:bg-slate-500' : 'bg-emerald-500 hover:bg-emerald-600'}`}
+                        >
+                            {match.isFinished ? '修改比分' : '确认成绩'}
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 积分榜表格组件
+        const StandingsTable = ({ groupName, teams }) => (
+            <div className="mb-8 bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
+                <div className="bg-emerald-600 text-white p-3 font-bold text-lg flex justify-between items-center">
+                    <span>{groupName}组 积分榜</span>
+                    <span className="text-sm font-normal bg-emerald-700 px-2 py-1 rounded">
+                        {groupName === 'A' ? '11号场地' : groupName === 'B' ? '12号场地' : groupName === 'C' ? '13号场地' : '14号场地'}
+                    </span>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left whitespace-nowrap">
+                        <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                            <tr>
+                                <th className="px-4 py-3">排名</th>
+                                <th className="px-4 py-3">队伍</th>
+                                <th className="px-4 py-3 text-center">已赛</th>
+                                <th className="px-4 py-3 text-center">胜/负</th>
+                                <th className="px-4 py-3 text-center">净胜分</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {teams.map((team, index) => (
+                                <tr key={team.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                    <td className="px-4 py-3 font-bold text-emerald-600">{index + 1}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-bold text-slate-800">{team.name}</div>
+                                        <div className="text-xs text-slate-500">{team.players}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center font-medium">{team.played}</td>
+                                    <td className="px-4 py-3 text-center text-slate-600">
+                                        <span className="text-emerald-600 font-bold">{team.wins}</span> - <span className="text-rose-500 font-bold">{team.losses}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center font-medium">{team.netPts > 0 ? `+${team.netPts}` : team.netPts}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+
+        // --- 初始化比赛对阵数据 ---
+        const INITIAL_MATCHES = [
+            // A组 (11号场地)
+            { id: 'A1', group: 'A', court: '11号场地', round: 1, t1Id: '4', t2Id: '6', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'A2', group: 'A', court: '11号场地', round: 1, t1Id: '9', t2Id: '14', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'A3', group: 'A', court: '11号场地', round: 2, t1Id: '4', t2Id: '9', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'A4', group: 'A', court: '11号场地', round: 2, t1Id: '6', t2Id: '14', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'A5', group: 'A', court: '11号场地', round: 3, t1Id: '4', t2Id: '14', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'A6', group: 'A', court: '11号场地', round: 3, t1Id: '6', t2Id: '9', t1Points: '', t2Points: '', isFinished: false },
+            
+            // B组 (12号场地)
+            { id: 'B1', group: 'B', court: '12号场地', round: 1, t1Id: '1', t2Id: '3', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'B2', group: 'B', court: '12号场地', round: 1, t1Id: '8', t2Id: '12', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'B3', group: 'B', court: '12号场地', round: 2, t1Id: '1', t2Id: '8', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'B4', group: 'B', court: '12号场地', round: 2, t1Id: '3', t2Id: '12', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'B5', group: 'B', court: '12号场地', round: 3, t1Id: '1', t2Id: '12', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'B6', group: 'B', court: '12号场地', round: 3, t1Id: '3', t2Id: '8', t1Points: '', t2Points: '', isFinished: false },
+
+            // C组 (13号场地)
+            { id: 'C1', group: 'C', court: '13号场地', round: 1, t1Id: '2', t2Id: '7', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'C2', group: 'C', court: '13号场地', round: 1, t1Id: '10', t2Id: '15', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'C3', group: 'C', court: '13号场地', round: 2, t1Id: '2', t2Id: '10', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'C4', group: 'C', court: '13号场地', round: 2, t1Id: '7', t2Id: '15', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'C5', group: 'C', court: '13号场地', round: 3, t1Id: '2', t2Id: '15', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'C6', group: 'C', court: '13号场地', round: 3, t1Id: '7', t2Id: '10', t1Points: '', t2Points: '', isFinished: false },
+
+            // D组 (14号场地)
+            { id: 'D1', group: 'D', court: '14号场地', round: 1, t1Id: '5', t2Id: '11', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'D2', group: 'D', court: '14号场地', round: 1, t1Id: '13', t2Id: '16', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'D3', group: 'D', court: '14号场地', round: 2, t1Id: '5', t2Id: '13', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'D4', group: 'D', court: '14号场地', round: 2, t1Id: '11', t2Id: '16', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'D5', group: 'D', court: '14号场地', round: 3, t1Id: '5', t2Id: '16', t1Points: '', t2Points: '', isFinished: false },
+            { id: 'D6', group: 'D', court: '14号场地', round: 3, t1Id: '11', t2Id: '13', t1Points: '', t2Points: '', isFinished: false },
+        ];
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('A'); // 'A', 'B', 'C', 'D', 'STANDINGS'
+            const [matches, setMatches] = useState(() => {
+                // 尝试从本地存储恢复数据
+                const saved = localStorage.getItem('badmintonMatches');
+                if (saved) return JSON.parse(saved);
+                return INITIAL_MATCHES;
+            });
+
+            // 当比分数据改变时，自动保存到本地，防止刷新丢失
+            useEffect(() => {
+                localStorage.setItem('badmintonMatches', JSON.stringify(matches));
+            }, [matches]);
+
+            const getTeam = (id) => TEAMS.find(t => t.id === id);
+
+            const handleScoreChange = (matchId, field, value) => {
+                const numValue = value === '' ? '' : parseInt(value, 10);
+                setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: numValue } : m));
+            };
+
+            const toggleMatchStatus = (matchId) => {
+                setMatches(prev => prev.map(m => {
+                    if (m.id === matchId) {
+                        // 如果要完成比赛，检查比分是否已填写
+                        if (!m.isFinished && (m.t1Points === '' || m.t2Points === '')) {
+                            alert('请先填写比分再确认比赛结果！');
+                            return m;
+                        }
+                        return { ...m, isFinished: !m.isFinished };
+                    }
+                    return m;
+                }));
+            };
+
+            const resetData = () => {
+                if(window.confirm('警告：此操作将清空所有已填写的比分数据！确认清空吗？')) {
+                    setMatches(INITIAL_MATCHES);
+                    localStorage.removeItem('badmintonMatches');
+                }
+            };
+
+            // 计算积分榜
+            const standings = useMemo(() => {
+                const stats = {};
+                TEAMS.forEach(t => {
+                    stats[t.id] = { ...t, played: 0, wins: 0, losses: 0, ptsWon: 0, ptsLost: 0 };
+                });
+
+                matches.forEach(m => {
+                    if (m.isFinished) {
+                        const t1 = stats[m.t1Id];
+                        const t2 = stats[m.t2Id];
+                        
+                        t1.played++; t2.played++;
+                        
+                        // 计算胜负场（直接根据单局比分判断）
+                        if (m.t1Points > m.t2Points) { t1.wins++; t2.losses++; }
+                        else if (m.t2Points > m.t1Points) { t2.wins++; t1.losses++; }
+
+                        // 计算得分
+                        t1.ptsWon += (m.t1Points || 0); t1.ptsLost += (m.t2Points || 0);
+                        t2.ptsWon += (m.t2Points || 0); t2.ptsLost += (m.t1Points || 0);
+                    }
+                });
+
+                // 按组分类并排序 (胜场 > 净胜分)
+                const grouped = { A: [], B: [], C: [], D: [] };
+                Object.values(stats).forEach(team => {
+                    team.netPts = team.ptsWon - team.ptsLost;
+                    grouped[team.group].push(team);
+                });
+
+                Object.keys(grouped).forEach(group => {
+                    grouped[group].sort((a, b) => {
+                        if (b.wins !== a.wins) return b.wins - a.wins;
+                        return b.netPts - a.netPts;
+                    });
+                });
+
+                return grouped;
+            }, [matches]);
+
+            // --- 渲染组件 ---
+            
+            return (
+                <div className="max-w-4xl mx-auto pb-20">
+                    {/* 顶部导航 */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm px-4 pt-4 pb-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <h1 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-2 md:mb-0">
+                            🏸 赛事计分系统
+                        </h1>
+                        <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-[-1px]">
+                            {['A', 'B', 'C', 'D'].map(group => (
+                                <button key={group} 
+                                    onClick={() => setActiveTab(group)}
+                                    className={`px-4 py-3 font-bold whitespace-nowrap border-b-4 transition-colors ${activeTab === group ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                    {group}组录入
+                                </button>
+                            ))}
+                            <button 
+                                onClick={() => setActiveTab('STANDINGS')}
+                                className={`px-4 py-3 font-bold whitespace-nowrap border-b-4 transition-colors ${activeTab === 'STANDINGS' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}
+                            >
+                                📊 实时积分榜
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 主内容区 */}
+                    <div className="p-4">
+                        {['A', 'B', 'C', 'D'].includes(activeTab) && (
+                            <div className="animate-fade-in">
+                                <div className="mb-4 bg-emerald-100 text-emerald-800 p-3 rounded-lg flex justify-between items-center">
+                                    <span className="font-bold">
+                                        📍 当前场地: {activeTab === 'A' ? '11号' : activeTab === 'B' ? '12号' : activeTab === 'C' ? '13号' : '14号'}场地 ({activeTab}组)
+                                    </span>
+                                </div>
+                                {matches.filter(m => m.group === activeTab).map(match => (
+                                    <MatchCard 
+                                        key={match.id} 
+                                        match={match} 
+                                        t1={getTeam(match.t1Id)} 
+                                        t2={getTeam(match.t2Id)}
+                                        onScoreChange={handleScoreChange}
+                                        onToggleStatus={toggleMatchStatus}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {activeTab === 'STANDINGS' && (
+                            <div className="animate-fade-in">
+                                <StandingsTable groupName="A" teams={standings.A} />
+                                <StandingsTable groupName="B" teams={standings.B} />
+                                <StandingsTable groupName="C" teams={standings.C} />
+                                <StandingsTable groupName="D" teams={standings.D} />
+                                
+                                <div className="mt-8 text-center">
+                                    <button onClick={resetData} className="text-sm text-rose-500 underline hover:text-rose-600">
+                                        ⚠ 清空所有比赛数据重置系统
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
