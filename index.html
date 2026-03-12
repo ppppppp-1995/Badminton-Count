@@ -13,6 +13,28 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <!-- 引入 Tailwind CSS 用于快速响应式布局 -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- --- 新增：引入 Firebase 库 --- -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 将 Firebase 函数挂载到 window，以便 React 可以使用
+        window.initializeApp = initializeApp;
+        window.getAuth = getAuth;
+        window.signInAnonymously = signInAnonymously;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.signInWithCustomToken = signInWithCustomToken;
+        window.getFirestore = getFirestore;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.onSnapshot = onSnapshot;
+        window.collection = collection;
+        window.getDocs = getDocs;
+        window.writeBatch = writeBatch;
+    </script>
+
     <style>
         input[type="number"]::-webkit-inner-spin-button,
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -53,7 +75,7 @@
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-type="module">
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- 队伍基础数据 ---
@@ -76,7 +98,7 @@
             { id: '16', name: '16队', players: 'Ray / 小赖', group: 'D' },
         ];
 
-        // --- 初始化小组赛数据 ---
+        // --- 初始化数据 ---
         const INITIAL_MATCHES = [
             { id: 'A1', group: 'A', court: '11号场地', round: 1, t1Id: '4', t2Id: '6', t1Points: '', t2Points: '', isFinished: false },
             { id: 'A2', group: 'A', court: '15号场地', round: 1, t1Id: '9', t2Id: '14', t1Points: '', t2Points: '', isFinished: false },
@@ -104,7 +126,6 @@
             { id: 'D6', group: 'D', court: '14号场地', round: 3, t1Id: '11', t2Id: '13', t1Points: '', t2Points: '', isFinished: false },
         ];
 
-        // --- 初始化淘汰赛数据 ---
         const INITIAL_KNOCKOUT = {
             phase: 'NONE', // NONE, DRAWING, BRACKET
             drawQueue: [], // 出线队伍排队抽签
@@ -151,9 +172,9 @@
                             <div className="text-xs text-slate-500">{t1.players}</div>
                         </div>
                         <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg w-full md:w-auto justify-center">
-                            <input type="number" min="0" disabled={!isAdmin || match.isFinished} className="w-16 h-12 text-center text-xl font-bold rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 disabled:bg-transparent disabled:opacity-80" value={match.t1Points} onChange={(e) => onScoreChange(match.id, 't1Points', e.target.value)} />
+                            <input type="number" min="0" disabled={!isAdmin || match.isFinished} className="w-16 h-12 text-center text-xl font-bold rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 disabled:bg-transparent disabled:opacity-80 disabled:cursor-not-allowed" value={match.t1Points} onChange={(e) => onScoreChange(match.id, 't1Points', e.target.value)} />
                             <span className="text-2xl font-black text-slate-300">:</span>
-                            <input type="number" min="0" disabled={!isAdmin || match.isFinished} className="w-16 h-12 text-center text-xl font-bold rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 disabled:bg-transparent disabled:opacity-80" value={match.t2Points} onChange={(e) => onScoreChange(match.id, 't2Points', e.target.value)} />
+                            <input type="number" min="0" disabled={!isAdmin || match.isFinished} className="w-16 h-12 text-center text-xl font-bold rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 disabled:bg-transparent disabled:opacity-80 disabled:cursor-not-allowed" value={match.t2Points} onChange={(e) => onScoreChange(match.id, 't2Points', e.target.value)} />
                         </div>
                         <div className="flex-1 w-full text-center md:text-left">
                             <div className="text-lg font-bold text-slate-800">{t2.name}</div>
@@ -191,7 +212,7 @@
                             ) : <span className="text-sm text-slate-400 font-normal py-1">虚位以待...</span>}
                         </div>
                         <input type="number" value={match.t1Points} onChange={(e) => onScoreChange(match.id, 't1Points', e.target.value)}
-                            className="w-10 h-8 text-center bg-white border border-slate-300 rounded text-sm font-bold shrink-0 disabled:bg-transparent" 
+                            className="w-10 h-8 text-center bg-white border border-slate-300 rounded text-sm font-bold shrink-0 disabled:bg-transparent disabled:cursor-not-allowed" 
                             disabled={!isAdmin || !match.t1 || !match.t2 || match.isFinished} />
                     </div>
 
@@ -206,7 +227,7 @@
                             ) : <span className="text-sm text-slate-400 font-normal py-1">虚位以待...</span>}
                         </div>
                         <input type="number" value={match.t2Points} onChange={(e) => onScoreChange(match.id, 't2Points', e.target.value)}
-                            className="w-10 h-8 text-center bg-white border border-slate-300 rounded text-sm font-bold shrink-0 disabled:bg-transparent" 
+                            className="w-10 h-8 text-center bg-white border border-slate-300 rounded text-sm font-bold shrink-0 disabled:bg-transparent disabled:cursor-not-allowed" 
                             disabled={!isAdmin || !match.t1 || !match.t2 || match.isFinished} />
                     </div>
 
@@ -224,15 +245,22 @@
 
         // --- 主应用组件 ---
         const App = () => {
-            // 权限认证状态
+            const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+            const [firebaseUser, setFirebaseUser] = useState(null); // 新增：保存用户登录态
+            
             const [userRole, setUserRole] = useState(() => localStorage.getItem('bd_user_role_v3') || null); // 'ADMIN', 'GUEST', null
             const [loginPassword, setLoginPassword] = useState('');
             const [showPasswordField, setShowPasswordField] = useState(false);
 
             const [activeTab, setActiveTab] = useState('SCHEDULE'); 
-            const [matches, setMatches] = useState(() => JSON.parse(localStorage.getItem('bd_groups_v3')) || INITIAL_MATCHES);
-            const [knockout, setKnockout] = useState(() => JSON.parse(localStorage.getItem('bd_knockout_v3')) || INITIAL_KNOCKOUT);
+            const [matches, setMatches] = useState(INITIAL_MATCHES);
+            const [knockout, setKnockout] = useState(INITIAL_KNOCKOUT);
             
+            const dbRef = useRef(null);
+            
+            // 核心安全修复：动态读取平台分配的专属 ID，不使用硬编码
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+
             // 抽签动画状态: idle (待机), rolling (扭蛋摇晃中), revealed (结果展示)
             const [drawAnimState, setDrawAnimState] = useState('idle');
             const [drawnResult, setDrawnResult] = useState(null);
@@ -258,6 +286,125 @@
                 });
             };
 
+            // =========================================================
+            // 核心：Firebase 严格安全认证及初始化挂载 (第一层 useEffect)
+            // =========================================================
+            useEffect(() => {
+                let unsubscribeAuth = null;
+
+                const checkFirebase = setInterval(() => {
+                    if (window.initializeApp && window.getFirestore) {
+                        clearInterval(checkFirebase);
+                        
+                        try {
+                            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                            
+                            // 若不在正式运行环境中，切回单机缓存模式
+                            if (Object.keys(firebaseConfig).length === 0) {
+                                console.warn("运行在无云端环境中，已切换为本地存储模式。");
+                                const savedMatches = localStorage.getItem('bd_groups_v3');
+                                const savedKnockout = localStorage.getItem('bd_knockout_v3');
+                                if (savedMatches) setMatches(JSON.parse(savedMatches));
+                                if (savedKnockout) setKnockout(JSON.parse(savedKnockout));
+                                setIsFirebaseReady(true);
+                                return;
+                            }
+
+                            // 为应对 React 严格模式导致的重复初始化报错，引入 try-catch 保护
+                            let app;
+                            try {
+                                app = window.initializeApp(firebaseConfig);
+                            } catch(e) {
+                                app = window.getAuth().app; 
+                            }
+                            
+                            const auth = window.getAuth(app);
+                            const db = window.getFirestore(app);
+                            dbRef.current = db;
+
+                            // 强制必须先完成匿名/Token注册
+                            const initAuth = async () => {
+                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                    await window.signInWithCustomToken(auth, __initial_auth_token);
+                                } else {
+                                    await window.signInAnonymously(auth);
+                                }
+                            };
+                            initAuth();
+
+                            // 监听确切的账号状态，拿到合法的 User 实体才算真正 Ready
+                            unsubscribeAuth = window.onAuthStateChanged(auth, (user) => {
+                                setFirebaseUser(user);
+                                if (user) {
+                                    setIsFirebaseReady(true);
+                                }
+                            });
+
+                        } catch (e) {
+                            console.error("Firebase Auth 初始化发生错误", e);
+                            setIsFirebaseReady(true);
+                        }
+                    }
+                }, 100);
+
+                return () => {
+                    clearInterval(checkFirebase);
+                    if (unsubscribeAuth) unsubscribeAuth();
+                };
+            }, []);
+
+            // =========================================================
+            // 核心：在确认获得了 FirebaseUser 后才执行数据监听 (第二层 useEffect)
+            // =========================================================
+            useEffect(() => {
+                // 这个前置判断是防止 "insufficient permissions" 报错的终极防线
+                if (!firebaseUser || !dbRef.current) return;
+
+                const db = dbRef.current;
+                const publicDataRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'tournament');
+                
+                const unsubscribeGroups = window.onSnapshot(
+                    window.doc(publicDataRef, 'groups'), 
+                    (snapshot) => {
+                        if (snapshot.exists() && snapshot.data().matches) {
+                            setMatches(snapshot.data().matches);
+                        }
+                    },
+                    (err) => console.error("小组赛云端同步失败", err)
+                );
+
+                const unsubscribeKnockout = window.onSnapshot(
+                    window.doc(publicDataRef, 'knockout'), 
+                    (snapshot) => {
+                        if (snapshot.exists()) {
+                            setKnockout(snapshot.data());
+                        }
+                    },
+                    (err) => console.error("淘汰赛云端同步失败", err)
+                );
+
+                return () => {
+                    unsubscribeGroups();
+                    unsubscribeKnockout();
+                };
+            }, [firebaseUser, appId]); // 只有当 firebaseUser 存在时触发
+
+            // 专门处理“向云端保存数据”的函数
+            const saveToCloud = (type, data) => {
+                if (userRole !== 'ADMIN') return;
+                
+                // 本地同步留底
+                if(type === 'groups') localStorage.setItem('bd_groups_v3', JSON.stringify(data));
+                if(type === 'knockout') localStorage.setItem('bd_knockout_v3', JSON.stringify(data));
+
+                // 只有拿到有效令牌的管理员能推数据
+                if (dbRef.current && firebaseUser) {
+                    const publicDataRef = window.collection(dbRef.current, 'artifacts', appId, 'public', 'data', 'tournament');
+                    window.setDoc(window.doc(publicDataRef, type), type === 'groups' ? { matches: data } : data)
+                        .catch(err => console.error(`保存 ${type} 到云端失败:`, err));
+                }
+            };
+
             useEffect(() => {
                 if (userRole) {
                     localStorage.setItem('bd_user_role_v3', userRole);
@@ -266,12 +413,9 @@
                 }
             }, [userRole]);
 
-            useEffect(() => localStorage.setItem('bd_groups_v3', JSON.stringify(matches)), [matches]);
-            useEffect(() => localStorage.setItem('bd_knockout_v3', JSON.stringify(knockout)), [knockout]);
 
             const getTeam = (id) => TEAMS.find(t => t.id === id);
 
-            // 提前到最外层计算积分榜 (修复 React 报错 #310: 不能在 early return 之后调用 Hooks)
             const standings = useMemo(() => {
                 const stats = {};
                 TEAMS.forEach(t => stats[t.id] = { ...t, played: 0, wins: 0, losses: 0, ptsWon: 0, ptsLost: 0 });
@@ -311,18 +455,27 @@
                 });
             };
 
-            // 如果未登录，渲染登录页
+            if (!isFirebaseReady) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                        <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-slate-200 border-t-emerald-500 mb-4"></div>
+                            <div className="text-slate-500 font-bold">安全连接服务器中...</div>
+                        </div>
+                    </div>
+                );
+            }
+
             if (!userRole) {
                 return (
                     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 animate-fade-in relative overflow-hidden">
-                        {/* 纯CSS背景点缀 */}
                         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob"></div>
                         <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-amber-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-2000"></div>
                         
                         <div className="bg-white p-8 md:p-12 rounded-3xl shadow-2xl w-full max-w-md text-center z-10 border border-slate-100">
                             <div className="text-6xl mb-6">🏸</div>
                             <h1 className="text-3xl font-black text-slate-800 mb-2">羽食俱进杯</h1>
-                            <p className="text-slate-500 mb-10 font-medium">第一届双打比赛 官方数据系统</p>
+                            <p className="text-slate-500 mb-10 font-medium">第一届双打比赛 实时战况系统</p>
 
                             {!showPasswordField ? (
                                 <div className="space-y-5">
@@ -356,35 +509,46 @@
                             )}
                         </div>
                         <div className="mt-8 text-slate-400 text-xs text-center z-10">
-                            系统专为【羽食俱进杯】定制研发
+                            数据云端实时同步 • 专为【羽食俱进杯】研发
                         </div>
                     </div>
                 );
             }
 
-            // --- 小组赛逻辑 (以下业务逻辑需鉴权处已加保护) ---
+            // --- 小组赛逻辑 (修改后触发同步) ---
             const handleScoreChange = (matchId, field, value) => {
                 if(userRole !== 'ADMIN') return;
                 const numValue = value === '' ? '' : parseInt(value, 10);
-                setMatches(prev => prev.map(m => m.id === matchId ? { ...m, [field]: numValue } : m));
+                const newMatches = matches.map(m => m.id === matchId ? { ...m, [field]: numValue } : m);
+                setMatches(newMatches);
             };
 
             const toggleMatchStatus = (matchId) => {
                 if(userRole !== 'ADMIN') return;
-                setMatches(prev => {
-                    const match = prev.find(m => m.id === matchId);
-                    if (!match.isFinished) {
-                        if (match.t1Points === '' || match.t2Points === '') { 
-                            setTimeout(() => customAlert('请先填写比分！'), 0); 
-                            return prev; 
+                let errorFound = false;
+                const newMatches = matches.map(m => {
+                    if (m.id === matchId) {
+                        if (!m.isFinished) {
+                            if (m.t1Points === '' || m.t2Points === '') { 
+                                setTimeout(() => customAlert('请先填写比分！'), 0); 
+                                errorFound = true;
+                                return m; 
+                            }
+                            if (m.t1Points === m.t2Points) { 
+                                setTimeout(() => customAlert('小组赛不允许平局，请决出胜负！'), 0); 
+                                errorFound = true;
+                                return m; 
+                            }
                         }
-                        if (match.t1Points === match.t2Points) { 
-                            setTimeout(() => customAlert('小组赛不允许平局，请决出胜负！'), 0); 
-                            return prev; 
-                        }
+                        return { ...m, isFinished: !m.isFinished };
                     }
-                    return prev.map(m => m.id === matchId ? { ...m, isFinished: !m.isFinished } : m);
+                    return m;
                 });
+                
+                if(!errorFound) {
+                    setMatches(newMatches);
+                    saveToCloud('groups', newMatches); 
+                }
             };
 
             // --- 图片生成逻辑 ---
@@ -418,19 +582,21 @@
                 }, 500); 
             };
 
-            // --- 淘汰赛逻辑 ---
+            // --- 淘汰赛逻辑 (修改后触发同步) ---
             const startKnockout = () => {
                 if(userRole !== 'ADMIN') return;
                 const doStart = () => {
                     const qualifiedFirsts = [standings.A[0], standings.B[0], standings.C[0], standings.D[0]].map(t => ({...t, type: '小组第一'}));
                     const qualifiedSeconds = [standings.A[1], standings.B[1], standings.C[1], standings.D[1]].map(t => ({...t, type: '小组第二'}));
                     
-                    setKnockout(prev => ({
-                        ...prev,
+                    const newKnockout = {
+                        ...knockout,
                         phase: 'DRAWING',
                         drawQueue: [...qualifiedFirsts, ...qualifiedSeconds],
                         drawIndex: 0
-                    }));
+                    };
+                    setKnockout(newKnockout);
+                    saveToCloud('knockout', newKnockout); 
                 };
 
                 if(!isGroupStageFinished) {
@@ -472,18 +638,20 @@
                 const currentTeam = knockout.drawQueue[knockout.drawIndex];
                 const slotInfo = SLOT_NAMES[drawnResult];
                 
-                setKnockout(prev => {
-                    const newMatches = JSON.parse(JSON.stringify(prev.matches));
-                    newMatches[slotInfo.matchId][slotInfo.slot] = currentTeam;
-                    
-                    const nextIndex = prev.drawIndex + 1;
-                    return {
-                        ...prev,
-                        drawIndex: nextIndex,
-                        matches: newMatches,
-                        phase: nextIndex >= 8 ? 'BRACKET' : 'DRAWING'
-                    };
-                });
+                const newMatches = JSON.parse(JSON.stringify(knockout.matches));
+                newMatches[slotInfo.matchId][slotInfo.slot] = currentTeam;
+                
+                const nextIndex = knockout.drawIndex + 1;
+                const newKnockout = {
+                    ...knockout,
+                    drawIndex: nextIndex,
+                    matches: newMatches,
+                    phase: nextIndex >= 8 ? 'BRACKET' : 'DRAWING'
+                };
+
+                setKnockout(newKnockout);
+                saveToCloud('knockout', newKnockout); 
+                
                 setDrawAnimState('idle');
                 setDrawnResult(null);
             };
@@ -499,31 +667,31 @@
 
             const toggleKnockoutMatch = (matchId) => {
                 if(userRole !== 'ADMIN') return;
-                setKnockout(prev => {
-                    const newMatches = JSON.parse(JSON.stringify(prev.matches));
-                    const match = newMatches[matchId];
+                let errorFound = false;
 
-                    if (!match.isFinished) {
-                        if (match.t1Points === '' || match.t2Points === '') { 
-                            setTimeout(() => customAlert('请填写完整比分！'), 0); 
-                            return prev; 
-                        }
-                        if (match.t1Points === match.t2Points) { 
-                            setTimeout(() => customAlert('淘汰赛必须分出胜负！'), 0); 
-                            return prev; 
-                        }
-                        
+                const newMatches = JSON.parse(JSON.stringify(knockout.matches));
+                const match = newMatches[matchId];
+
+                if (!match.isFinished) {
+                    if (match.t1Points === '' || match.t2Points === '') { 
+                        setTimeout(() => customAlert('请填写完整比分！'), 0); 
+                        errorFound = true;
+                    } else if (match.t1Points === match.t2Points) { 
+                        setTimeout(() => customAlert('淘汰赛必须分出胜负！'), 0); 
+                        errorFound = true;
+                    } else {
                         match.isFinished = true;
                         const winner = match.t1Points > match.t2Points ? match.t1 : match.t2;
                         
                         if (match.nextMatch) {
                             newMatches[match.nextMatch][match.nextSlot] = winner;
                         }
+                    }
+                } else {
+                    if (match.nextMatch && newMatches[match.nextMatch].isFinished) {
+                        setTimeout(() => customAlert('⚠️ 下一轮比赛的比分已确认！请先撤销下一轮的比分，再来修改这一轮。'), 0);
+                        errorFound = true;
                     } else {
-                        if (match.nextMatch && newMatches[match.nextMatch].isFinished) {
-                            setTimeout(() => customAlert('⚠️ 下一轮比赛的比分已确认！请先撤销下一轮的比分，再来修改这一轮。'), 0);
-                            return prev;
-                        }
                         match.isFinished = false;
                         if (match.nextMatch) {
                             newMatches[match.nextMatch][match.nextSlot] = null;
@@ -531,14 +699,19 @@
                             newMatches[match.nextMatch].t2Points = '';
                         }
                     }
-                    return { ...prev, matches: newMatches };
-                });
+                }
+
+                if(!errorFound) {
+                    const newKnockout = { ...knockout, matches: newMatches };
+                    setKnockout(newKnockout);
+                    saveToCloud('knockout', newKnockout); 
+                }
             };
 
             // --- 开发者测试快捷键 ---
             const devAutoFillGroupStage = () => {
                 customConfirm('此操作将随机填满所有小组赛比分，仅用于测试淘汰赛功能！\n确认要执行吗？', () => {
-                    setMatches(prev => prev.map(m => {
+                    const newMatches = matches.map(m => {
                         const isT1Winner = Math.random() > 0.5;
                         const winnerScore = 21;
                         const loserScore = Math.floor(Math.random() * 10) + 10; 
@@ -548,17 +721,19 @@
                             t2Points: isT1Winner ? loserScore : winnerScore, 
                             isFinished: true 
                         };
-                    }));
-                    customAlert("✅ 小组赛比分已全部随机填满！\n你可以前往【📊 积分榜】查看出线情况，或直接前往【🏆 淘汰赛】进行八强抽签。");
+                    });
+                    setMatches(newMatches);
+                    saveToCloud('groups', newMatches); 
+                    customAlert("✅ 小组赛比分已全部随机填满并推送！");
                 });
             };
 
             const resetAllData = () => {
                 customConfirm('⚠️ 危险：此操作将清空所有比赛和抽签数据！\n你确定要重置系统吗？', () => {
-                    localStorage.removeItem('bd_groups_v3');
-                    localStorage.removeItem('bd_knockout_v3');
                     setMatches(INITIAL_MATCHES);
                     setKnockout(INITIAL_KNOCKOUT);
+                    saveToCloud('groups', INITIAL_MATCHES);
+                    saveToCloud('knockout', INITIAL_KNOCKOUT);
                     setActiveTab('SCHEDULE'); 
                 });
             };
@@ -571,6 +746,10 @@
                         <div className="flex items-center justify-between w-full md:w-auto shrink-0">
                             <h1 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-2 md:mb-0">
                                 🏸 第一届【羽食俱进杯】
+                                <div className="hidden md:flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100 ml-2" title="云端连接正常，数据实时同步中">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <span className="text-[10px] text-emerald-600 font-bold">实时更新</span>
+                                </div>
                             </h1>
                             {/* 移动端显示的身份标签与退出按钮 */}
                             <div className="md:hidden flex items-center gap-3">
@@ -672,6 +851,13 @@
                         {/* 小组赛录入 */}
                         {['A', 'B', 'C', 'D'].includes(activeTab) && (
                             <div className="animate-fade-in max-w-4xl mx-auto">
+                                <div className="mb-4 text-center">
+                                    {userRole === 'ADMIN' ? (
+                                        <p className="text-xs text-slate-400">你正在修改比分，修改确认后所有人将自动同步更新</p>
+                                    ) : (
+                                        <p className="text-xs text-emerald-500 font-bold bg-emerald-50 inline-block px-3 py-1 rounded-full">数据由裁判实时打分同步</p>
+                                    )}
+                                </div>
                                 {matches.filter(m => m.group === activeTab).map(match => (
                                     <MatchCard key={match.id} match={match} t1={getTeam(match.t1Id)} t2={getTeam(match.t2Id)} onScoreChange={handleScoreChange} onToggleStatus={toggleMatchStatus} userRole={userRole} />
                                 ))}
@@ -742,7 +928,7 @@
                                         {userRole === 'ADMIN' ? (
                                             <button onClick={startKnockout} 
                                                 className="px-8 py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-full text-lg shadow-lg transform transition active:scale-95">
-                                                {isGroupStageFinished ? '👉 生成八强名单并开始抽签' : '⚠️ 小组赛未赛完 (强制进入抽签)'}
+                                                {isGroupStageFinished ? '👉 生成八强名单并同步至大屏' : '⚠️ 小组赛未赛完 (强制进入抽签)'}
                                             </button>
                                         ) : (
                                             <div className="text-xl font-bold text-amber-500 mt-4 px-6 py-4 bg-amber-50 rounded-2xl border border-amber-200 inline-block">
@@ -753,8 +939,15 @@
                                 )}
 
                                 {knockout.phase === 'DRAWING' && (
-                                    <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-amber-200 mt-4 text-center">
-                                        <h2 className="text-2xl font-black text-amber-600 mb-6">八强抽签仪式</h2>
+                                    <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg border border-amber-200 mt-4 text-center relative overflow-hidden">
+                                        {/* 所有人都能看到抽签界面，但只有管理员能点 */}
+                                        {userRole !== 'ADMIN' && (
+                                            <div className="absolute top-0 left-0 w-full p-2 bg-rose-500 text-white text-xs font-bold tracking-widest z-10 animate-pulse">
+                                                🔴 现场抽签直播中，正在同步管理员操作...
+                                            </div>
+                                        )}
+
+                                        <h2 className="text-2xl font-black text-amber-600 mb-6 pt-4">八强抽签仪式</h2>
                                         
                                         <div className="bg-slate-50 p-6 rounded-xl mb-8">
                                             <p className="text-slate-500 text-sm mb-2">当前抽签队伍 ({knockout.drawIndex + 1}/8)：</p>
@@ -788,14 +981,14 @@
                                                                 {SLOT_NAMES[drawnResult].name}
                                                             </div>
                                                             <button onClick={confirmDrawnResult} className="px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-full shadow-md text-lg transition-transform active:scale-95">
-                                                                ✅ 确认落座，有请下一位
+                                                                ✅ 确认落座同步，有请下一位
                                                             </button>
                                                         </div>
                                                     )}
                                                 </>
                                             ) : (
                                                 <div className="text-xl font-bold text-amber-500 animate-pulse bg-amber-50 px-8 py-4 rounded-full border border-amber-200">
-                                                    ⏳ 正在等待组织者进行抽签，请观看大屏幕...
+                                                    ⏳ 请看前方大屏幕或等待管理员点击抽签...
                                                 </div>
                                             )}
                                         </div>
@@ -874,11 +1067,11 @@
                                             </div>
                                             {userRole === 'ADMIN' ? (
                                                 <div className="text-center mt-6 text-sm text-slate-400">
-                                                    提示：裁判可直接在上方晋级树中修改比分，点击确认后胜者将自动晋级至下一轮。在 iPad 上可左右滑动查看全景。
+                                                    提示：裁判可直接在上方晋级树中修改比分，点击确认后所有人将自动同步最新战况。
                                                 </div>
                                             ) : (
                                                 <div className="text-center mt-6 text-sm text-slate-400">
-                                                    提示：淘汰赛结果由组织者实时更新，可以左右滑动查看完整晋级全景。
+                                                    提示：淘汰赛结果由组织者云端实时更新，可以左右滑动查看完整晋级全景。
                                                 </div>
                                             )}
                                         </div>
@@ -891,10 +1084,10 @@
                         {userRole === 'ADMIN' && (
                             <div className="mt-12 text-center border-t border-slate-200 pt-6">
                                 <button onClick={devAutoFillGroupStage} className="text-xs text-blue-400 underline mr-6 hover:text-blue-600 transition-colors">
-                                    🛠 测试用: 一键随机填满小组赛比分
+                                    🛠 测试用: 随机填满比分并广播
                                 </button>
                                 <button onClick={resetAllData} className="text-xs text-rose-400 underline hover:text-rose-600 transition-colors">
-                                    ⚠ 清空所有赛事数据重置系统
+                                    ⚠ 清空云端所有赛事数据
                                 </button>
                             </div>
                         )}
