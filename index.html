@@ -297,10 +297,19 @@
                         clearInterval(checkFirebase);
                         
                         try {
-                            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                            // ！！！注意！！！
+                            // 在这里填入你在 Firebase 控制台获取到的真实配置
+                            const firebaseConfig = {
+                                apiKey: "AIzaSyBUUccXqrmsgQySKhNO1oSawpinwNASCmk", // 替换为你的真实数据
+                                authDomain: "badminton-score-c48af.firebaseapp.com", // 替换为你的真实数据
+                                projectId: "YOUR_PROJECT_ID", // 替换为你的真实数据
+                                storageBucket: "badminton-score-c48af", // 替换为你的真实数据
+                                messagingSenderId: "971517022477", // 替换为你的真实数据
+                                appId: "1:971517022477:web:bbfac22b53b85321b66044" // 替换为你的真实数据
+                            };
                             
-                            // 若不在正式运行环境中，切回单机缓存模式
-                            if (Object.keys(firebaseConfig).length === 0) {
+                            // 若没有配置 apiKey，切回单机缓存模式（安全垫）
+                            if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
                                 console.warn("运行在无云端环境中，已切换为本地存储模式。");
                                 const savedMatches = localStorage.getItem('bd_groups_v3');
                                 const savedKnockout = localStorage.getItem('bd_knockout_v3');
@@ -322,13 +331,9 @@
                             const db = window.getFirestore(app);
                             dbRef.current = db;
 
-                            // 强制必须先完成匿名/Token注册
+                            // 强制必须先完成匿名注册 (因为移除了自定义Token，只保留匿名登录)
                             const initAuth = async () => {
-                                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                                    await window.signInWithCustomToken(auth, __initial_auth_token);
-                                } else {
-                                    await window.signInAnonymously(auth);
-                                }
+                                await window.signInAnonymously(auth);
                             };
                             initAuth();
 
@@ -361,7 +366,8 @@
                 if (!firebaseUser || !dbRef.current) return;
 
                 const db = dbRef.current;
-                const publicDataRef = window.collection(db, 'artifacts', appId, 'public', 'data', 'tournament');
+                // 简化了你在个人数据库中的路径
+                const publicDataRef = window.collection(db, 'tournament_data');
                 
                 const unsubscribeGroups = window.onSnapshot(
                     window.doc(publicDataRef, 'groups'), 
@@ -387,7 +393,7 @@
                     unsubscribeGroups();
                     unsubscribeKnockout();
                 };
-            }, [firebaseUser, appId]); // 只有当 firebaseUser 存在时触发
+            }, [firebaseUser]); // 只有当 firebaseUser 存在时触发，移除了无用的 appId
 
             // 专门处理“向云端保存数据”的函数
             const saveToCloud = (type, data) => {
@@ -399,7 +405,8 @@
 
                 // 只有拿到有效令牌的管理员能推数据
                 if (dbRef.current && firebaseUser) {
-                    const publicDataRef = window.collection(dbRef.current, 'artifacts', appId, 'public', 'data', 'tournament');
+                    // 简化保存路径
+                    const publicDataRef = window.collection(dbRef.current, 'tournament_data');
                     window.setDoc(window.doc(publicDataRef, type), type === 'groups' ? { matches: data } : data)
                         .catch(err => console.error(`保存 ${type} 到云端失败:`, err));
                 }
